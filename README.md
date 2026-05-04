@@ -76,9 +76,7 @@ The project includes:
 Predicted vs Actual Yield (Linear Regression)
 Error Distribution Plot
 Feature Importance (Positive Coefficients)
-# Extreme Weather Analysis
-Identifies extreme temperature years (top 10%)
-Evaluates model performance under extreme conditions
+
 # Libraries
 Python
 Pandas & NumPy
@@ -86,3 +84,6 @@ Scikit-learn
 XGBoost
 TensorFlow / Keras
 Matplotlib & Seaborn
+
+# Summary
+This project predicts crop yield using climate and extreme weather data. It combines datasets from FAOSTAT, NASA, and the World Bank, and applies machine learning models to evaluate how environmental factors affect agricultural productivity.
