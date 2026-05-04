@@ -60,7 +60,7 @@ The following models are implemented:
 Linear Regression
 Random Forest Regressor
 XGBoost Regressor
-Neural Network (Keras)
+Neural Network 
 
 # Evaluation Metrics
 
@@ -73,9 +73,9 @@ R² Score
 
 The project includes:
 
-Predicted vs Actual Yield (Linear Regression)
+Predicted vs Actual Yield
 Error Distribution Plot
-Feature Importance (Positive Coefficients)
+Feature Importance
 
 # Libraries
 Python
