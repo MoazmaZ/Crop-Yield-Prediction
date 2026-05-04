@@ -57,33 +57,21 @@ Extreme rainfall treated as a static country-level feature
 
 The following models are implemented:
 
-Linear Regression
-Random Forest Regressor
-XGBoost Regressor
-Neural Network 
+Linear Regression, Random Forest Regressor, XGBoost Regressor, Neural Network 
 
 # Evaluation Metrics
 
 Models are evaluated using:
 
-MAE (Mean Absolute Error)
-RMSE (Root Mean Squared Error)
-R² Score
+MAE (Mean Absolute Error), RMSE (Root Mean Squared Error), R² Score
 # Visualizations
 
 The project includes:
 
-Predicted vs Actual Yield
-Error Distribution Plot
-Feature Importance
+Predicted vs Actual Yield, Error Distribution Plot, Feature Importance
 
 # Libraries
-Python
-Pandas & NumPy
-Scikit-learn
-XGBoost
-TensorFlow / Keras
-Matplotlib & Seaborn
+Python, Pandas & NumPy, Scikit-learn, XGBoost, TensorFlow / Keras, Matplotlib & Seaborn
 
 # Summary
 This project predicts crop yield using climate and extreme weather data. It combines datasets from FAOSTAT, NASA, and the World Bank, and applies machine learning models to evaluate how environmental factors affect agricultural productivity.
