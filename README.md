@@ -75,3 +75,17 @@ Python, Pandas & NumPy, Scikit-learn, XGBoost, TensorFlow / Keras, Matplotlib & 
 
 # Summary
 This project predicts crop yield using climate and extreme weather data. It combines datasets from FAOSTAT, NASA, and the World Bank, and applies machine learning models to evaluate how environmental factors affect agricultural productivity.
+
+# How to Run
+1. Open the project notebook in Google Colab.
+2. Upload the required datasets when prompted:
+    faostat_yield.csv
+    nasa_climate.csv
+    worldbank_extreme_events.csv
+3. Run all cells in order from top to bottom.
+4. The code will automatically:
+    Load and preprocess the data
+    Merge datasets
+    Train machine learning models
+    Evaluate performance metrics (MAE, RMSE, R²)
+5. View results and model comparison outputs in the final sections of the notebook.
