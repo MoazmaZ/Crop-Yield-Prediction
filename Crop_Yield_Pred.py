@@ -12,7 +12,7 @@ import numpy as np
 from google.colab import files
 
 # ===== 1. UPLOAD =====
-print("👉 Upload ALL 3 files")
+print(" Upload ALL dataset files")
 uploaded = files.upload()
 
 # ===== 2. LOAD =====
