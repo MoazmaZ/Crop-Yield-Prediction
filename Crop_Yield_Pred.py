@@ -12,7 +12,7 @@ import numpy as np
 from google.colab import files
 
 # ===== 1. UPLOAD =====
-print(" Upload ALL dataset files")
+print("Upload All Dataset files")
 uploaded = files.upload()
 
 # ===== 2. LOAD =====
@@ -27,7 +27,7 @@ yield_df.rename(columns={
     "Value": "Yield"
 }, inplace=True)
 
-# Keep only selected countries (important for consistency)
+# Keep only selected countries
 countries = ["India", "Pakistan", "Palestine"]
 yield_df = yield_df[yield_df["Area"].isin(countries)]
 
@@ -58,19 +58,19 @@ climate_yearly.rename(columns={
     "PRECTOT": "Total_Rainfall"
 }, inplace=True)
 
-# ⚠️ Duplicate climate for each country (transparent assumption)
+# Climate for each country
 climate_expanded = pd.concat(
     [climate_yearly.assign(Area=country) for country in countries],
     ignore_index=True
 )
 
 
-# ===== 5. CLEAN EXTREME DATA (FINAL FIX) =====
+# ===== 5. CLEAN EXTREME DATA =====
 
 print("Columns:", extreme_df.columns)
 
 # Step 1: get original column name FIRST
-year_col_name = extreme_df.columns[2]   # e.g. '1995-07'
+year_col_name = extreme_df.columns[2]
 
 # Extract year
 year_value = int(year_col_name.split("-")[0])
@@ -107,7 +107,7 @@ print(extreme_yearly.head())
 # Merge climate normally (Area + Year)
 df = yield_df.merge(climate_expanded, on=["Area", "Year"], how="left")
 
-# 🔥 Merge extreme rainfall as STATIC feature (only on Area)
+# Merge extreme rainfall
 extreme_yearly["Year"] = extreme_yearly["Year"].astype(int)
 
 df = df.merge(
@@ -227,7 +227,7 @@ results = pd.DataFrame({
 print(results)
 
 # ==========================
-# 6. PLOTS (LINEAR REGRESSION ONLY)
+# 6. PLOTS (LINEAR REGRESSION)
 # ==========================
 
 # --- (1) Predicted vs Actual ---
@@ -254,13 +254,12 @@ plt.xlabel("Prediction Error")
 plt.show()
 
 
-# --- (4) Feature Coefficients Importance ---
+# --- (4) Feature Importance ---
 # ==========================
 # ==========================
 
 importance = pd.Series(lr.coef_, index=X_train.columns)
 
-# keep only positive coefficients
 positive_importance = importance[importance > 0].sort_values()
 
 plt.figure(figsize=(8,6))
