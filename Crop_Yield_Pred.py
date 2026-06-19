@@ -157,11 +157,20 @@ from tensorflow.keras.layers import Dense
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+import seaborn as sns
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.model_selection import learning_curve, TimeSeriesSplit
+from sklearn.metrics import make_scorer
+
 
 np.random.seed(42)
 
 
-df = pd.read_csv("final_dataset.csv")
+df = pd.read_csv("final_dateset.csv")
 
 df = pd.get_dummies(df, columns=["Area"], drop_first=True)
 
@@ -268,6 +277,36 @@ plt.title("Linear Regression Feature Importance")
 plt.xlabel("Coefficient Value")
 plt.show()
 
+#--- Model comparison bar chart
+
+
+models = ['Linear\nRegression', 'Random\nForest', 'XGBoost', 'Neural\nNetwork']
+mae = [0.1447, 0.1745, 0.2189, 0.6072]
+rmse = [0.1807, 0.2117, 0.2653, 0.7534]
+mae_ci = [0.0466, 0.0643, 0.0748, 0.2258]  # half-width of 95% CI
+rmse_ci = [0.0430, 0.0541, 0.0748, 0.2258]
+
+x = np.arange(len(models))
+width = 0.35
+
+fig, ax = plt.subplots(figsize=(8, 5))
+bars1 = ax.bar(x - width/2, mae, width, label='MAE', color='steelblue',
+               yerr=mae_ci, capsize=4, alpha=0.85)
+bars2 = ax.bar(x + width/2, rmse, width, label='RMSE', color='coral',
+               yerr=rmse_ci, capsize=4, alpha=0.85)
+
+ax.set_xlabel('Model', fontsize=12)
+ax.set_ylabel('Error (ton/ha)', fontsize=12)
+ax.set_title('Model Performance Comparison (MAE and RMSE)\nwith 95% Bootstrap Confidence Intervals', fontsize=12)
+ax.set_xticks(x)
+ax.set_xticklabels(models)
+ax.legend()
+ax.grid(axis='y', linestyle='--', alpha=0.5)
+plt.tight_layout()
+plt.savefig('fig9_model_comparison.png', dpi=300)
+plt.show()
+
+
 
 extreme_threshold = X_test["Avg_Temp"] > X_test["Avg_Temp"].quantile(0.9)
 
@@ -281,3 +320,406 @@ if extreme_years.shape[0] > 0:
     )
 else:
     print("No extreme weather samples found in test set.")
+
+
+# ── Collect all predictions in one dict (uses your variables) ──
+all_preds = {
+    'Linear Regression': lr_pred,
+    'Random Forest':     rf_pred,
+    'XGBoost':           xgb_pred,
+    'Neural Network':    nn_pred,
+}
+model_names = list(all_preds.keys())
+short_names = ['Linear\nRegression', 'Random\nForest', 'XGBoost', 'Neural\nNetwork']
+
+# ── Shared style ────────────────────────────────────────────
+plt.rcParams.update({
+    'font.family':       'DejaVu Sans',
+    'font.size':          11,
+    'axes.titlesize':     12,
+    'axes.labelsize':     11,
+    'legend.fontsize':    10,
+    'figure.dpi':         150,
+    'axes.spines.top':    False,
+    'axes.spines.right':  False,
+})
+
+# Colours per model — colourblind-friendly palette
+MODEL_COLOURS = {
+    'Linear Regression': '#2166AC',
+    'Random Forest':     '#4DAC26',
+    'XGBoost':           '#D6604D',
+    'Neural Network':    '#762A83',
+}
+
+
+# ── Helper ───────────────────────────────────────────────────
+def get_metrics(y_true, y_pred):
+    mae  = mean_absolute_error(y_true, y_pred)
+    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+    r2   = r2_score(y_true, y_pred)
+    return mae, rmse, r2
+
+all_metrics = {n: get_metrics(y_test, p) for n, p in all_preds.items()}
+
+# ════════════════════════════════════════════════════════════
+# FIG. 10 — Residual Analysis
+#            Residual (Predicted − Actual) vs. Predicted Yield
+# ════════════════════════════════════════════════════════════
+
+fig10, axes10 = plt.subplots(2, 2, figsize=(12, 9))
+axes10 = axes10.flatten()
+
+for ax, name in zip(axes10, model_names):
+    yp  = all_preds[name]
+    res = yp - np.array(y_test)          # residual = predicted − actual
+    c   = MODEL_COLOURS[name]
+    mae_v, rmse_v, r2_v = all_metrics[name]
+
+    # ── scatter ──
+    ax.scatter(yp, res,
+               color=c, alpha=0.75,
+               edgecolors='white', linewidths=0.5,
+               s=70, zorder=3, label='Residual')
+
+    # ── zero reference line ──
+    ax.axhline(0, color='black', linewidth=1.4,
+               linestyle='--', zorder=2, label='Zero line')
+
+    # ── ±RMSE shaded band ──
+    ax.axhspan(-rmse_v, rmse_v, color=c, alpha=0.10,
+               zorder=1, label=f'±RMSE ({rmse_v:.3f})')
+
+    # ── linear trend through residuals ──
+    if len(yp) > 2:
+        coef = np.polyfit(yp, res, 1)
+        xline = np.linspace(yp.min(), yp.max(), 100)
+        ax.plot(xline, np.polyval(coef, xline),
+                color='black', linewidth=1.3, linestyle='-',
+                zorder=4, label='Trend')
+
+    # ── annotations ──
+    bias = res.mean()
+    ax.text(0.97, 0.97,
+            f'MAE  = {mae_v:.4f}\nRMSE = {rmse_v:.4f}\n$R^2$  = {r2_v:.4f}\nBias = {bias:+.4f}',
+            transform=ax.transAxes,
+            fontsize=9, va='top', ha='right',
+            bbox=dict(boxstyle='round,pad=0.4', fc='white', alpha=0.85))
+
+    ax.set_title(name, fontweight='bold')
+    ax.set_xlabel('Predicted Yield (ton/ha)')
+    ax.set_ylabel('Residual: Predicted − Actual (ton/ha)')
+    ax.grid(linestyle='--', alpha=0.35, zorder=0)
+    ax.legend(fontsize=8.5, loc='lower right', framealpha=0.9)
+
+fig10.suptitle('Residual Analysis: Residuals vs. Predicted Yield\n'
+               'Dashed line = zero error │ Shaded band = ±RMSE │ Solid line = trend',
+               fontsize=12, fontweight='bold', y=1.01)
+fig10.tight_layout()
+fig10.savefig('fig10_residual_analysis.png', dpi=300, bbox_inches='tight')
+plt.show()
+print("Saved → fig10_residual_analysis.png")
+
+
+# ════════════════════════════════════════════════════════════
+# FIG. 11 — Learning Curves
+#            Training MAE vs. Test MAE 
+# ════════════════════════════════════════════════════════════
+#
+# NOTE: Rebuild the models here using sklearn-only equivalents so the
+# learning_curve loop runs quickly.  The GradientBoostingRegressor replicates
+
+from sklearn.linear_model import LinearRegression as _LR
+from sklearn.ensemble import RandomForestRegressor as _RF
+from sklearn.ensemble import GradientBoostingRegressor as _GBR
+from sklearn.neural_network import MLPRegressor as _MLP
+
+LC_MODELS = {
+    'Linear Regression': (_LR(),                                              True),
+    'Random Forest':     (_RF(n_estimators=200, max_depth=10, random_state=42), False),
+    'XGBoost':           (_GBR(n_estimators=200, learning_rate=0.05,
+                               max_depth=6, random_state=42),                  False),
+    'Neural Network':    (_MLP(hidden_layer_sizes=(64, 32), activation='relu',
+                               max_iter=500, random_state=42),                 True),
+}
+
+# Progressive training-subset sizes (fraction of training rows, earliest first)
+FRACS  = np.linspace(0.20, 1.0, 8)
+SIZES  = [max(10, int(f * X_train_scaled.shape[0])) for f in FRACS]   # absolute row counts
+
+print("\nComputing learning curves …")
+lc_results = {}   # name → (train_maes, test_maes) arrays
+
+for name, (mdl, use_scaled) in LC_MODELS.items():
+    tr_maes, te_maes = [], []
+    Xtr_full = X_train_scaled if use_scaled else np.array(X_train)
+    Xte_full = X_test_scaled  if use_scaled else np.array(X_test)
+    y_tr     = np.array(y_train)
+    y_te     = np.array(y_test)
+
+    for n in SIZES:
+        Xtr_sub = Xtr_full[:n]          # take first n rows (chronologically earliest)
+        y_sub   = y_tr[:n]
+        mdl.fit(Xtr_sub, y_sub)
+        tr_maes.append(mean_absolute_error(y_sub, mdl.predict(Xtr_sub)))
+        te_maes.append(mean_absolute_error(y_te,  mdl.predict(Xte_full)))
+
+    lc_results[name] = (np.array(tr_maes), np.array(te_maes))
+    print(f"  {name:20s}  train_MAE_final={tr_maes[-1]:.4f}  "
+          f"test_MAE_final={te_maes[-1]:.4f}")
+
+# ── plot ──
+fig11, axes11 = plt.subplots(2, 2, figsize=(12, 9))
+axes11 = axes11.flatten()
+
+for ax, name in zip(axes11, model_names):
+    tr_mae, te_mae = lc_results[name]
+    c = MODEL_COLOURS[name]
+
+    ax.plot(SIZES, tr_mae, 'o-',  color=c, linewidth=2.2,
+            markersize=7, label='Training MAE', zorder=3)
+    ax.plot(SIZES, te_mae, 's--', color=c, linewidth=2.0,
+            markersize=7, alpha=0.72, label='Test MAE (2016–2020)', zorder=3)
+
+    # shade gap between training and test curves
+    ax.fill_between(SIZES, tr_mae, te_mae,
+                    alpha=0.12, color=c, label='Generalisation gap')
+
+    # final gap annotation
+    gap = te_mae[-1] - tr_mae[-1]
+    ax.text(0.97, 0.97,
+            f'Final gap\n(test−train MAE):\n{gap:.4f}',
+            transform=ax.transAxes,
+            fontsize=9, va='top', ha='right',
+            bbox=dict(boxstyle='round,pad=0.4', fc='white', alpha=0.85))
+
+    ax.set_title(name, fontweight='bold')
+    ax.set_xlabel('Training Set Size (rows, chronological)')
+    ax.set_ylabel('MAE (ton/ha)')
+    ax.set_xticks(SIZES)
+    ax.grid(linestyle='--', alpha=0.35, zorder=0)
+    ax.legend(fontsize=9, framealpha=0.9)
+
+fig11.suptitle('Learning Curves: Training vs. Test MAE\n'
+               'Progressive training subsets │ Test set fixed at 2016–2020 │ '
+               'Shaded area = generalisation gap',
+               fontsize=12, fontweight='bold', y=1.01)
+fig11.tight_layout()
+fig11.savefig('fig11_learning_curves.png', dpi=300, bbox_inches='tight')
+plt.show()
+print("Saved → fig11_learning_curves.png")
+
+
+# ════════════════════════════════════════════════════════════
+# FIG. 12 — Time-Series Prediction Plot
+#            Actual vs. Linear Regression Predicted Yield
+# ════════════════════════════════════════════════════════════
+
+# Re-attach region labels to the test set for per-region plotting
+df_orig   = pd.read_csv("final_dateset.csv")      # reload with original Area column
+test_orig = df_orig[df_orig['Year'] > 2015].copy().reset_index(drop=True)
+test_orig['LR_Predicted'] = lr_pred                # attach predictions
+
+regions       = sorted(test_orig['Area'].unique())
+n_reg         = len(regions)
+region_palette = plt.cm.tab10(np.linspace(0, 0.55, n_reg))
+
+# 2 rows × 3 cols (5 regions + 1 spare panel used for summary table)
+fig12 = plt.figure(figsize=(15, 9))
+gs    = gridspec.GridSpec(2, 3, figure=fig12, hspace=0.42, wspace=0.32)
+
+for i, region in enumerate(regions):
+    row, col_idx = divmod(i, 3)
+    ax  = fig12.add_subplot(gs[row, col_idx])
+    rdf = test_orig[test_orig['Area'] == region].sort_values('Year')
+    c   = region_palette[i]
+
+    # ── lines ──
+    ax.plot(rdf['Year'], rdf['Yield'],
+            'o-', color=c, linewidth=2.2, markersize=8,
+            label='Actual Yield', zorder=3)
+    ax.plot(rdf['Year'], rdf['LR_Predicted'],
+            's--', color=c, linewidth=2.0, markersize=8,
+            alpha=0.65, label='LR Predicted', zorder=3)
+
+    # ── shaded error band ──
+    ax.fill_between(rdf['Year'],
+                    rdf['Yield'], rdf['LR_Predicted'],
+                    alpha=0.14, color=c)
+
+    # ── Δ error labels above each test point ──
+    for _, row_d in rdf.iterrows():
+        err = abs(row_d['LR_Predicted'] - row_d['Yield'])
+        ypos = max(row_d['Yield'], row_d['LR_Predicted']) + 0.03
+        ax.annotate(f'Δ{err:.3f}',
+                    xy=(row_d['Year'], ypos),
+                    ha='center', fontsize=8, color='#444444')
+
+    # ── per-region metrics ──
+    reg_mae  = mean_absolute_error(rdf['Yield'], rdf['LR_Predicted'])
+    reg_rmse = np.sqrt(mean_squared_error(rdf['Yield'], rdf['LR_Predicted']))
+    reg_r2   = r2_score(rdf['Yield'], rdf['LR_Predicted'])
+
+    ax.text(0.03, 0.06,
+            f'MAE={reg_mae:.3f} │ RMSE={reg_rmse:.3f} │ R²={reg_r2:.3f}',
+            transform=ax.transAxes, fontsize=8.5,
+            bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.85))
+
+    ax.set_title(region, fontweight='bold')
+    ax.set_xlabel('Year')
+    ax.set_ylabel('Yield (ton/ha)')
+    ax.set_xticks(rdf['Year'])
+    ax.tick_params(axis='x', rotation=30)
+    ax.grid(linestyle='--', alpha=0.35, zorder=0)
+    ax.legend(fontsize=8.5, loc='upper right', framealpha=0.9)
+
+# ── 6th panel: summary comparison table ──
+ax_tbl = fig12.add_subplot(gs[1, 2])
+ax_tbl.axis('off')
+
+region_rows = []
+for region in regions:
+    rdf = test_orig[test_orig['Area'] == region]
+    mae  = mean_absolute_error(rdf['Yield'], rdf['LR_Predicted'])
+    rmse = np.sqrt(mean_squared_error(rdf['Yield'], rdf['LR_Predicted']))
+    r2   = r2_score(rdf['Yield'], rdf['LR_Predicted'])
+    region_rows.append([region, f'{mae:.3f}', f'{rmse:.3f}', f'{r2:.3f}'])
+
+tbl = ax_tbl.table(
+    cellText=region_rows,
+    colLabels=['Region', 'MAE', 'RMSE', 'R²'],
+    cellLoc='center', loc='center',
+    bbox=[0, 0.1, 1, 0.8]
+)
+tbl.auto_set_font_size(False)
+tbl.set_fontsize(9.5)
+for (r, c), cell in tbl.get_celld().items():
+    if r == 0:
+        cell.set_facecolor('#2166AC')
+        cell.set_text_props(color='white', fontweight='bold')
+    else:
+        cell.set_facecolor('#f5f5f5' if r % 2 == 0 else 'white')
+ax_tbl.set_title('Per-Region Summary\n(Linear Regression)', fontweight='bold', fontsize=10)
+
+fig12.suptitle('Time-Series Prediction: Actual vs. Predicted Yield (2016–2020)\n'
+               'Linear Regression │ Time-Aware Split: Train ≤ 2015 │ Test > 2015',
+               fontsize=13, fontweight='bold', y=1.01)
+
+fig12.savefig('fig12_timeseries_prediction.png', dpi=300, bbox_inches='tight')
+plt.show()
+print("Saved → fig12_timeseries_prediction.png")
+
+
+# ════════════════════════════════════════════════════════════
+# EXTREME YEARS ANALYSIS —
+# Computes exact MAE for normal vs extreme climate years
+# ════════════════════════════════════════════════════════════
+
+import numpy as np
+from sklearn.metrics import mean_absolute_error
+
+# ----------------------------------------------------------
+# Step 1: Define extreme years using 90th percentile
+# threshold calculated from the TRAINING set
+# to avoid data leakage
+# ----------------------------------------------------------
+
+train_temp_90 = np.percentile(X_train["Avg_Temp"],        90)
+train_rain_90 = np.percentile(X_train["Total_Rainfall"],  90)
+
+print(f"90th percentile Avg_Temp    (from training set): {train_temp_90:.3f} °C")
+print(f"90th percentile Total_Rain  (from training set): {train_rain_90:.3f} mm")
+
+# A test-set row is "extreme" if EITHER threshold is exceeded
+extreme_mask = (
+    (X_test["Avg_Temp"]       > train_temp_90) |
+    (X_test["Total_Rainfall"] > train_rain_90)
+)
+normal_mask = ~extreme_mask
+
+print(f"\nTest set total rows : {len(y_test)}")
+print(f"  Normal  years     : {normal_mask.sum()}")
+print(f"  Extreme years     : {extreme_mask.sum()}")
+
+# ----------------------------------------------------------
+# Step 2: Collect all predictions (matches your variable names)
+# ----------------------------------------------------------
+
+all_preds = {
+    "Linear Regression": lr_pred,
+    "Random Forest":     rf_pred,
+    "XGBoost":           xgb_pred,
+    "Neural Network":    nn_pred,
+}
+
+# ----------------------------------------------------------
+# Step 3: Compute MAE for normal vs extreme subsets
+# ----------------------------------------------------------
+
+y_test_arr = np.array(y_test)
+
+print("\n" + "="*58)
+print(f"{'Model':<20} {'Normal MAE':>12} {'Extreme MAE':>13}")
+print("="*58)
+
+results_extreme = {}
+
+for name, preds in all_preds.items():
+    preds = np.array(preds)
+
+    if normal_mask.sum() > 0:
+        normal_mae = mean_absolute_error(
+            y_test_arr[normal_mask], preds[normal_mask]
+        )
+    else:
+        normal_mae = float("nan")
+        print(f"  WARNING: No normal-year samples found in test set.")
+
+    if extreme_mask.sum() > 0:
+        extreme_mae = mean_absolute_error(
+            y_test_arr[extreme_mask], preds[extreme_mask]
+        )
+    else:
+        extreme_mae = float("nan")
+        print(f"  WARNING: No extreme-year samples found in test set.")
+
+    results_extreme[name] = (normal_mae, extreme_mae)
+    print(f"{name:<20} {normal_mae:>12.4f} {extreme_mae:>13.4f}")
+
+print("="*58)
+
+# ----------------------------------------------------------
+# Step 5: Bar chart to visualise the comparison
+# ----------------------------------------------------------
+
+import matplotlib.pyplot as plt
+
+names      = list(results_extreme.keys())
+normal_maes  = [results_extreme[n][0] for n in names]
+extreme_maes = [results_extreme[n][1] for n in names]
+
+x     = np.arange(len(names))
+width = 0.35
+
+fig, ax = plt.subplots(figsize=(9, 5))
+ax.bar(x - width/2, normal_maes,  width, label="Normal years",
+       color="steelblue", alpha=0.85)
+ax.bar(x + width/2, extreme_maes, width, label="Extreme years",
+       color="coral",     alpha=0.85)
+
+ax.set_xlabel("Model", fontsize=12)
+ax.set_ylabel("MAE (ton/ha)", fontsize=12)
+ax.set_title(
+    "Model MAE: Normal vs. Extreme Climate Years\n"
+    "(Extreme = above 90th percentile of training Avg_Temp or Total_Rainfall)",
+    fontsize=11
+)
+ax.set_xticks(x)
+ax.set_xticklabels(["Linear\nRegression", "Random\nForest",
+                     "XGBoost", "Neural\nNetwork"])
+ax.legend()
+ax.grid(axis="y", linestyle="--", alpha=0.5)
+plt.tight_layout()
+plt.savefig("fig_extreme_years.png", dpi=300)
+plt.show()
+print("Saved → fig_extreme_years.png")
